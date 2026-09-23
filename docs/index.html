@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Release management and post-release data analysis for product managers. Hypothesis-driven release measurement dashboard.">
+<title>Post-launch review dashboard &mdash; release-mgmt</title>
+<style>
+  :root {
+    --ink: #1a2332; --muted: #5b6b82; --line: #e3e9f2; --bg: #f6f8fb;
+    --hit: #1a7f4b; --hit-bg: #e6f6ec; --marginal: #9a6b00; --marginal-bg: #fdf3dd;
+    --miss: #b3261e; --miss-bg: #fdecea; --nodata: #5b6b82; --nodata-bg: #eef1f6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+         Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  header { background: var(--ink); color: #fff; padding: 2.2rem 1.2rem; }
+  header .wrap, main .wrap { max-width: 960px; margin: 0 auto; }
+  header h1 { margin: 0 0 .4rem; font-size: 1.7rem; }
+  header p { margin: 0; color: #b9c4d6; max-width: 640px; line-height: 1.5; }
+  main { padding: 1.6rem 1.2rem 3rem; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px;
+          padding: 1.4rem 1.5rem; margin-bottom: 1.4rem; }
+  .card h2 { margin: 0 0 .2rem; font-size: 1.25rem; }
+  .meta { color: var(--muted); font-size: .9rem; margin-bottom: .9rem; }
+  .meta span { margin-right: 1rem; }
+  .hyp { background: var(--bg); border-left: 3px solid var(--ink);
+         padding: .7rem .9rem; font-style: italic; color: #33415a;
+         margin: 0 0 1rem; line-height: 1.5; }
+  .scorebar { height: 10px; background: var(--line); border-radius: 6px;
+              overflow: hidden; margin: .4rem 0 .2rem; }
+  .scorebar div { height: 100%; border-radius: 6px; }
+  .scoreline { display: flex; justify-content: space-between; align-items: baseline;
+               margin-bottom: 1rem; }
+  .scoreline strong { font-size: 1.4rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .82rem;
+       text-transform: uppercase; letter-spacing: .04em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .pill { display: inline-block; padding: .15rem .6rem; border-radius: 999px;
+          font-size: .78rem; font-weight: 700; text-transform: uppercase;
+          letter-spacing: .05em; }
+  .hit { background: var(--hit-bg); color: var(--hit); }
+  .marginal { background: var(--marginal-bg); color: var(--marginal); }
+  .miss { background: var(--miss-bg); color: var(--miss); }
+  .no-data { background: var(--nodata-bg); color: var(--nodata); }
+  .howto { font-size: .95rem; line-height: 1.65; color: #33415a; }
+  .howto code { background: var(--nodata-bg); padding: .1rem .4rem; border-radius: 4px; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 2rem 1rem; }
+  footer a { color: var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Post-launch review dashboard</h1>
+    <p>Release management and post-release data analysis for product managers.
+       Every release below declared its hypothesis and success metrics up front;
+       the dashboard scores observed data against those targets.</p>
+  </div>
+</header>
+<main><div class="wrap" id="releases"></div>
+  <div class="wrap"><div class="card">
+    <h2>How scoring works</h2>
+    <div class="howto">
+      <p>For each metric, the observed value is the <strong>mean of readings inside
+         the measurement window</strong> (ship date through ship date + window days;
+         readings outside the window are ignored).</p>
+      <p>% of target achieved: <code>observed / target &times; 100</code> for
+         <em>increase</em> metrics, <code>target / observed &times; 100</code> for
+         <em>decrease</em> metrics. Verdicts: <strong>hit</strong> at 100%+,
+         <strong>marginal</strong> at 90&ndash;99.9%, <strong>miss</strong> below 90%.
+         A release scores the mean of its metrics; its verdict is hit only if every
+         metric hit.</p>
+    </div>
+  </div></div>
+</main>
+<footer>
+  Built by Alok Band &middot;
+  <a href="https://github.com/bandalok/release-management-post-launch-analytics">GitHub repo</a>
+  &middot; demo data is fictional
+</footer>
+<script>
+const RELEASES = [
+  {"id":"checkout-redesign","name":"One-page checkout redesign","version":"2.4.0",
+   "ship_date":"2026-06-15","owner":"Priya Nair",
+   "hypothesis":"Collapsing the 3-step checkout into a single page will reduce friction enough to lift conversion, because funnel analysis shows 40% of drop-off happens between steps 2 and 3.",
+   "metrics":[
+     {"name":"conversion-rate","target":4.2,"direction":"increase","window_days":14},
+     {"name":"checkout-time-sec","target":95,"direction":"decrease","window_days":14},
+     {"name":"cart-abandonment-pct","target":62,"direction":"decrease","window_days":14}]},
+  {"id":"pricing-experiment","name":"Pricing page A/B: annual-first","version":"1.9.0",
+   "ship_date":"2026-07-20","owner":"Diego Santos",
+   "hypothesis":"Leading with the annual plan (instead of monthly) on the pricing page will shift plan mix toward annual, because annual buyers currently discover the option only after selecting monthly.",
+   "metrics":[
+     {"name":"annual-plan-share-pct","target":35,"direction":"increase","window_days":21},
+     {"name":"trial-start-rate-pct","target":8.5,"direction":"increase","window_days":21}]},
+  {"id":"onboarding-flow","name":"Mobile onboarding: 3-step flow","version":"3.1.0",
+   "ship_date":"2026-08-10","owner":"Amara Okafor",
+   "hypothesis":"Replacing the 7-screen tutorial with a 3-step interactive flow will raise completion and early retention, because session replays show users dropping off at screen 4.",
+   "metrics":[
+     {"name":"day7-retention-pct","target":28,"direction":"increase","window_days":28},
+     {"name":"onboarding-completion-pct","target":72,"direction":"increase","window_days":14},
+     {"name":"support-tickets-per-1k","target":12,"direction":"decrease","window_days":14}]}
+];
+// [release_id, metric_name, date, value]
+const READINGS = [
+["checkout-redesign","conversion-rate","2026-06-16",4.1],["checkout-redesign","conversion-rate","2026-06-18",4.4],
+["checkout-redesign","conversion-rate","2026-06-20",4.3],["checkout-redesign","conversion-rate","2026-06-23",4.5],
+["checkout-redesign","conversion-rate","2026-06-26",4.2],["checkout-redesign","conversion-rate","2026-06-28",4.4],
+["checkout-redesign","checkout-time-sec","2026-06-16",92],["checkout-redesign","checkout-time-sec","2026-06-18",88],
+["checkout-redesign","checkout-time-sec","2026-06-20",94],["checkout-redesign","checkout-time-sec","2026-06-23",90],
+["checkout-redesign","checkout-time-sec","2026-06-26",91],["checkout-redesign","checkout-time-sec","2026-06-28",89],
+["checkout-redesign","cart-abandonment-pct","2026-06-16",64],["checkout-redesign","cart-abandonment-pct","2026-06-18",63.5],
+["checkout-redesign","cart-abandonment-pct","2026-06-20",65],["checkout-redesign","cart-abandonment-pct","2026-06-23",64.2],
+["checkout-redesign","cart-abandonment-pct","2026-06-26",63.8],["checkout-redesign","cart-abandonment-pct","2026-06-28",64.5],
+["pricing-experiment","annual-plan-share-pct","2026-07-22",36],["pricing-experiment","annual-plan-share-pct","2026-07-25",37],
+["pricing-experiment","annual-plan-share-pct","2026-07-28",35.5],["pricing-experiment","annual-plan-share-pct","2026-08-01",38],
+["pricing-experiment","annual-plan-share-pct","2026-08-05",36.5],["pricing-experiment","annual-plan-share-pct","2026-08-08",37.2],
+["pricing-experiment","trial-start-rate-pct","2026-07-22",7.2],["pricing-experiment","trial-start-rate-pct","2026-07-25",7.5],
+["pricing-experiment","trial-start-rate-pct","2026-07-28",7.1],["pricing-experiment","trial-start-rate-pct","2026-08-01",7.4],
+["pricing-experiment","trial-start-rate-pct","2026-08-05",7.3],["pricing-experiment","trial-start-rate-pct","2026-08-08",7.6],
+["onboarding-flow","day7-retention-pct","2026-08-15",22],["onboarding-flow","day7-retention-pct","2026-08-20",23],
+["onboarding-flow","day7-retention-pct","2026-08-25",21.5],["onboarding-flow","day7-retention-pct","2026-08-30",22.8],
+["onboarding-flow","day7-retention-pct","2026-09-03",23.2],["onboarding-flow","day7-retention-pct","2026-09-06",22.4],
+["onboarding-flow","onboarding-completion-pct","2026-08-12",68],["onboarding-flow","onboarding-completion-pct","2026-08-14",70],
+["onboarding-flow","onboarding-completion-pct","2026-08-16",69],["onboarding-flow","onboarding-completion-pct","2026-08-18",71],
+["onboarding-flow","onboarding-completion-pct","2026-08-21",68.5],["onboarding-flow","onboarding-completion-pct","2026-08-23",69.5],
+["onboarding-flow","support-tickets-per-1k","2026-08-12",10.5],["onboarding-flow","support-tickets-per-1k","2026-08-14",11],
+["onboarding-flow","support-tickets-per-1k","2026-08-16",10.8],["onboarding-flow","support-tickets-per-1k","2026-08-18",11.2],
+["onboarding-flow","support-tickets-per-1k","2026-08-21",10.6],["onboarding-flow","support-tickets-per-1k","2026-08-23",10.9]
+];
+
+function addDays(iso, n) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function verdict(pct) {
+  if (pct === null) return "no-data";
+  if (pct >= 100) return "hit";
+  if (pct >= 90) return "marginal";
+  return "miss";
+}
+function pill(v) {
+  return '<span class="pill ' + v + '">' + v.replace("-", " ") + "</span>";
+}
+function barColor(score) {
+  if (score === null) return "#5b6b82";
+  if (score >= 100) return "#1a7f4b";
+  if (score >= 90) return "#9a6b00";
+  return "#b3261e";
+}
+
+const root = document.getElementById("releases");
+RELEASES.forEach(function (rel) {
+  const rows = rel.metrics.map(function (m) {
+    const end = addDays(rel.ship_date, m.window_days);
+    const vals = READINGS
+      .filter(function (r) {
+        return r[0] === rel.id && r[1] === m.name &&
+               r[2] >= rel.ship_date && r[2] <= end;
+      })
+      .map(function (r) { return r[3]; });
+    let observed = null, pct = null;
+    if (vals.length) {
+      observed = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+      pct = m.direction === "increase"
+        ? (observed / m.target) * 100
+        : (m.target / observed) * 100;
+    }
+    const v = verdict(pct);
+    return { m: m, observed: observed, pct: pct, n: vals.length, v: v };
+  });
+  const withData = rows.filter(function (r) { return r.pct !== null; });
+  const score = withData.length
+    ? withData.reduce(function (a, r) { return a + r.pct; }, 0) / withData.length
+    : null;
+  let releaseVerdict = "no-data";
+  if (withData.length) {
+    const vs = new Set(withData.map(function (r) { return r.v; }));
+    releaseVerdict = vs.size === 1 && vs.has("hit") ? "hit"
+      : vs.has("miss") ? "miss" : "marginal";
+  }
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML =
+    "<h2>" + rel.name + "</h2>" +
+    '<div class="meta"><span>Version ' + rel.version + "</span>" +
+    "<span>Shipped " + rel.ship_date + "</span>" +
+    "<span>Owner: " + rel.owner + "</span></div>" +
+    '<p class="hyp">&ldquo;' + rel.hypothesis + "&rdquo;</p>" +
+    '<div class="scoreline"><strong>' +
+      (score === null ? "n/a" : score.toFixed(1) + "% of target") +
+      "</strong>" + pill(releaseVerdict) + "</div>" +
+    '<div class="scorebar"><div style="width:' +
+      Math.min(score === null ? 0 : score, 120) / 1.2 + "%;background:" +
+      barColor(score) + '"></div></div>' +
+    '<table><thead><tr><th>Metric</th><th class="num">Target</th>' +
+    '<th class="num">Observed</th><th class="num">% of target</th><th>Verdict</th>' +
+    "</tr></thead><tbody>" +
+    rows.map(function (r) {
+      const arrow = r.m.direction === "increase" ? "&#8599;" : "&#8600;";
+      return "<tr><td>" + r.m.name + " " + arrow + " <small>(" + r.m.window_days + "d)</small></td>" +
+        '<td class="num">' + r.m.target + "</td>" +
+        '<td class="num">' + (r.observed === null ? "n/a" : r.observed.toFixed(2)) + "</td>" +
+        '<td class="num">' + (r.pct === null ? "n/a" : r.pct.toFixed(1) + "%") + "</td>" +
+        "<td>" + pill(r.v) + "</td></tr>";
+    }).join("") + "</tbody></table>";
+  root.appendChild(card);
+});
+</script>
+</body>
+</html>
